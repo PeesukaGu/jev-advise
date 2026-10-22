@@ -2,15 +2,15 @@
 
 [日本語](README.ja.md)
 
-A Claude Code plugin that shows [Jev](https://docs.typesafe.ai)'s probabilities next to the choices Claude offers you. It only displays them. You still make the choice.
+A Claude Code plugin that shows [Jev](https://docs.typesafe.ai)'s probabilities next to the choices Claude offers you. By default it only displays them and you make the choice. Turn on [`auto_select`](#settings) to let Jev answer AskUserQuestion for you when it is confident.
 
 - **AskUserQuestion**: each option's description starts with `[jev 0.80]`.
 - **Plain-text questions** (a grilling round, for one): each option line ends with `` `[jev 0.80]` ``. The plugin adds a short note to the session context that asks Claude to write these questions in a fixed format, and it only tags questions in that format.
-- `jev pick` marks Jev's top option, but only when its confidence is 0.6 or higher. On 221 real answers, Jev matched the user 72% of the time above that line and 45–60% below it.
+- `jev pick` marks Jev's top option, but only when its confidence reaches [`pick_threshold`](#settings), 0.6 by default. On 221 real answers, Jev matched the user 72% of the time above that line and 45–60% below it.
 
-Claude and Jev never see each other's recommendation:
+Claude and Jev do not see each other's recommendation:
 
-- The tags are added to what you see only. Claude never reads Jev's output.
+- The tags are added to what you see only. Claude never reads Jev's output. The one exception is `auto_select`: when it answers for you, Claude receives Jev's pick as the answer, with a note that Jev chose it.
 - Jev reads the conversation up to your last prompt, at most the last 3000 characters. It does not see Claude's text from the current turn. `(Recommended)` marks and the `Recommendation:` line are removed before anything is sent to Jev.
 
 ## Requirements
