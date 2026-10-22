@@ -1,6 +1,6 @@
 {
   "name": "jev-advise",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Shows Jev's probabilities next to the choices Claude offers, without letting Claude or Jev see each other's recommendation",
   "license": "MIT",
   "author": {

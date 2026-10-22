@@ -21,7 +21,10 @@ const Q_START = /^\s*\**Q\d+\**\s*[-:：]/
 const OPTION = /^\s*[-*]\s+([A-Z])\.\s+(.+?)\s*$/
 const Q_END = /^\s*\**(Recommendation|推奨)\**\s*[:：]/i
 const RECOMMENDED_MARK = /\s*[(（]\s*(Recommended|推奨|おすすめ)\s*[)）]/gi
-const REMINDER = /<system-reminder>[\s\S]*?<\/system-reminder>/g
+// Text Claude Code writes into user messages: reminders, `!` command input and
+// output, slash command output, and background task notifications. Any of it
+// can hold secrets the user printed, so none of it is sent to Jev.
+const MACHINE_BLOCK = /<(system-reminder|bash-input|bash-stdout|bash-stderr|local-command-stdout|local-command-stderr|local-command-caveat|command-name|command-message|command-args|task-notification)>[\s\S]*?<\/\1>/g
 
 const FORMAT_RULE = `When you ask the user a multiple-choice question in your reply instead of with AskUserQuestion (a grilling round, for one), write each question in this format, every line starting at the left margin:
 
@@ -52,16 +55,19 @@ function recentContext(transcriptPath) {
     }
     const msg = entry.message ?? {}
     if (msg.role !== 'user' && msg.role !== 'assistant') continue
+    // Skill bodies, images and compact summaries arrive as user messages the user did not type.
+    if (entry.isMeta || entry.isCompactSummary) continue
     const content = msg.content
-    const parts = typeof content === 'string'
+    const parts = (typeof content === 'string'
       ? [content]
-      : Array.isArray(content) ? content.filter(c => c?.type === 'text').map(c => c.text) : []
-    // Skill bodies and images arrive as user messages the user did not type.
-    if (msg.role === 'user' && !entry.isMeta && parts.length) lastUser = texts.length
+      : Array.isArray(content) ? content.filter(c => c?.type === 'text').map(c => c.text) : [])
+      .map(p => p.replace(MACHINE_BLOCK, '').trim())
+      .filter(Boolean)
+    if (msg.role === 'user' && parts.length) lastUser = texts.length
     for (const p of parts) texts.push(`${msg.role}: ${p}`)
   }
   // Claude's text in the current turn may hold its recommendation, so Jev never sees it.
-  return texts.slice(0, lastUser + 1).join('\n').replace(REMINDER, '').slice(-MAX_CONTEXT_CHARS)
+  return texts.slice(0, lastUser + 1).join('\n').slice(-MAX_CONTEXT_CHARS)
 }
 
 function jevChoose(context, question, options) {

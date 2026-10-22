@@ -8,17 +8,17 @@ import { test } from 'node:test'
 const SCRIPT = new URL('../scripts/jev-advise.mjs', import.meta.url).pathname
 const ANSWER = { answers: { q: { choice: 'o0', confidence: 0.9, probabilities: { o0: 0.8, o1: 0.2 } } } }
 
-function setup(answer = ANSWER) {
+function setup(answer = ANSWER, entries = null) {
   const dir = mkdtempSync(join(tmpdir(), 'jev-advise-test-'))
   const sent = join(dir, 'sent.log')
   // A stand-in jev that records its arguments and stdin, then answers.
   writeFileSync(join(dir, 'jev'), `#!/bin/sh\nfor a in "$@"; do case "$a" in @*) cat "\${a#@}" >> '${sent}' ;; *) printf '%s\\n' "$a" >> '${sent}' ;; esac; done\ncat >> '${sent}'\nprintf '%s' '${JSON.stringify(answer)}'\n`)
   chmodSync(join(dir, 'jev'), 0o755)
   const transcript = join(dir, 'transcript.jsonl')
-  writeFileSync(transcript, [
+  writeFileSync(transcript, (entries ?? [
     { message: { role: 'user', content: 'which db?<system-reminder>secret</system-reminder>' } },
     { message: { role: 'assistant', content: [{ type: 'text', text: 'I recommend SQLite' }] } },
-  ].map(e => JSON.stringify(e)).join('\n'))
+  ]).map(e => JSON.stringify(e)).join('\n'))
   const run = (input, options = {}) => {
     const r = spawnSync('node', [SCRIPT], {
       input: JSON.stringify({ transcript_path: transcript, ...input }),
@@ -87,6 +87,22 @@ test('a jev that cannot run is reported on the options', () => {
   })
   const out = JSON.parse(r.stdout).hookSpecificOutput
   assert.deepEqual(out.updatedInput.questions[0].options.map(o => o.description), ['[jev failed] x', '[jev failed]'])
+})
+
+test('command output, task notifications, meta and compact summaries never reach jev', () => {
+  const { run, sent } = setup(ANSWER, [
+    { message: { role: 'user', content: '<bash-input>cat .env</bash-input>' } },
+    { message: { role: 'user', content: '<bash-stdout>API_KEY=bash-secret</bash-stdout><bash-stderr></bash-stderr>' } },
+    { message: { role: 'user', content: '<command-name>/env</command-name>\n<local-command-stdout>TOKEN=cmd-secret</local-command-stdout>\nwhich db should I use?' } },
+    { message: { role: 'user', content: '<task-notification><result>task-secret</result></task-notification>' } },
+    { isMeta: true, message: { role: 'user', content: 'meta-secret' } },
+    { isCompactSummary: true, message: { role: 'user', content: 'summary-secret' } },
+  ])
+  run({ hook_event_name: 'MessageDisplay', turn_id: 't', message_id: 's', index: 0, final: true, delta: '**Q1** - **DB**: which?\n- A. SQLite: a\n- B. PostgreSQL: b\n' })
+  for (const leaked of ['bash-secret', 'cat .env', 'cmd-secret', 'task-secret', 'meta-secret', 'summary-secret']) {
+    assert.doesNotMatch(sent(), new RegExp(leaked))
+  }
+  assert.match(sent(), /which db should I use\?/)
 })
 
 const ASK = {

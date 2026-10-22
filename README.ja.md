@@ -111,7 +111,7 @@ Recommendation: B。アプリはもう Google Workspace を使っているので
 
 ## TypeSafe に送るもの
 
-質問 1 つにつき、`api.typesafe.ai` へリクエストを 1 回送る。中身は質問と選択肢、上で書いた範囲の会話テキスト。system reminder とツールの入出力は送らない。
+質問 1 つにつき、`api.typesafe.ai` へリクエストを 1 回送る。中身は質問と選択肢、上で書いた範囲の会話テキスト（ユーザーが打った文と Claude が書いた文）。system reminder、ツールの入出力、`!` コマンドの入力と出力、スラッシュコマンドの出力、バックグラウンドタスクの通知、スキル本文、compact の要約は送らない。
 
 ## 開発
 

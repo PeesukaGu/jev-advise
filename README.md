@@ -111,7 +111,7 @@ With `auto_select` on, expect about one auto-selected answer in three or four to
 
 ## What is sent to TypeSafe
 
-Each question sends one request to `api.typesafe.ai`. The request holds the question, its options, and the conversation text described above. System reminders and tool inputs or outputs are not sent.
+Each question sends one request to `api.typesafe.ai`. The request holds the question, its options, and the conversation text described above: what you typed and what Claude wrote. System reminders, tool inputs and outputs, `!` command input and output, slash command output, background task notifications, skill bodies, and compact summaries are not sent.
 
 ## Development
 
