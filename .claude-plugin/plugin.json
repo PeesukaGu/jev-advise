@@ -1,9 +1,10 @@
 {
   "name": "jev-advise",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Shows Jev's probabilities next to the choices Claude offers, without letting Claude or Jev see each other's recommendation",
   "license": "MIT",
   "author": {
     "name": "PeesukaGu"
-  }
+  },
+  "repository": "https://github.com/PeesukaGu/jev-advise"
 }
