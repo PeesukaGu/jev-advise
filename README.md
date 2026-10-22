@@ -4,6 +4,8 @@
 
 A Claude Code plugin that shows [Jev](https://docs.typesafe.ai)'s probabilities next to the choices Claude offers you. By default it only displays them and you make the choice. Turn on [`auto_select`](#settings) to let Jev answer AskUserQuestion for you when it is confident.
 
+![Demo: Jev probabilities next to Claude Code choices](docs/demo.gif)
+
 - **AskUserQuestion**: each option's description starts with `[jev 0.80]`.
 - **Plain-text questions** (a grilling round, for one): each option line ends with `` `[jev 0.80]` ``. The plugin adds a short note to the session context that asks Claude to write these questions in a fixed format, and it only tags questions in that format.
 - `jev pick` marks Jev's top option, but only when its confidence reaches [`pick_threshold`](#settings), 0.6 by default. On 221 real answers, Jev matched the user 72% of the time above that line and 45–60% below it.
