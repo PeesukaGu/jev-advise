@@ -1,0 +1,13 @@
+{
+  "name": "jev-advise",
+  "owner": {
+    "name": "PeesukaGu"
+  },
+  "description": "Jev's probabilities next to the choices Claude offers",
+  "plugins": [
+    {
+      "name": "jev-advise",
+      "source": "./"
+    }
+  ]
+}
