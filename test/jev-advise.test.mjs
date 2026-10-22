@@ -19,11 +19,11 @@ function setup(answer = ANSWER) {
     { message: { role: 'user', content: 'which db?<system-reminder>secret</system-reminder>' } },
     { message: { role: 'assistant', content: [{ type: 'text', text: 'I recommend SQLite' }] } },
   ].map(e => JSON.stringify(e)).join('\n'))
-  const run = input => {
+  const run = (input, options = {}) => {
     const r = spawnSync('node', [SCRIPT], {
       input: JSON.stringify({ transcript_path: transcript, ...input }),
       encoding: 'utf8',
-      env: { ...process.env, PATH: `${dir}:${process.env.PATH}`, CLAUDE_PLUGIN_DATA: dir },
+      env: { ...process.env, PATH: `${dir}:${process.env.PATH}`, CLAUDE_PLUGIN_DATA: dir, ...options },
     })
     assert.equal(r.status, 0, r.stderr)
     return r.stdout ? JSON.parse(r.stdout).hookSpecificOutput : null
@@ -87,6 +87,41 @@ test('a jev that cannot run is reported on the options', () => {
   })
   const out = JSON.parse(r.stdout).hookSpecificOutput
   assert.deepEqual(out.updatedInput.questions[0].options.map(o => o.description), ['[jev failed] x', '[jev failed]'])
+})
+
+const ASK = {
+  hook_event_name: 'PreToolUse',
+  tool_name: 'AskUserQuestion',
+  tool_input: { questions: [{ question: 'DB?', header: 'DB', multiSelect: false, options: [{ label: 'SQLite', description: 'embedded' }, { label: 'PostgreSQL', description: 'server' }] }] },
+}
+
+test('auto-select answers with the pick when Jev picks every question', () => {
+  const { run } = setup()
+  const out = run(ASK, { CLAUDE_PLUGIN_OPTION_AUTO_SELECT: 'true' })
+  assert.equal(out.permissionDecision, 'allow')
+  assert.deepEqual(out.updatedInput.answers, { 'DB?': 'SQLite' })
+  assert.match(out.additionalContext, /the user did not pick/)
+})
+
+test('auto-select leaves the dialog to the user below the threshold', () => {
+  const { run } = setup()
+  const out = run(ASK, { CLAUDE_PLUGIN_OPTION_AUTO_SELECT: 'true', CLAUDE_PLUGIN_OPTION_PICK_THRESHOLD: '0.95' })
+  assert.equal(out.permissionDecision, 'ask')
+  assert.equal(out.updatedInput.answers, undefined)
+  assert.equal(out.updatedInput.questions[0].options[0].description, '[jev 0.80] embedded')
+})
+
+test('auto-select skips multi-select questions', () => {
+  const { run } = setup()
+  const multi = structuredClone(ASK)
+  multi.tool_input.questions[0].multiSelect = true
+  assert.equal(run(multi, { CLAUDE_PLUGIN_OPTION_AUTO_SELECT: 'true' }).permissionDecision, 'ask')
+})
+
+test('a lower threshold turns a weak answer into a pick', () => {
+  const { run } = setup({ answers: { q: { choice: 'o0', confidence: 0.3, probabilities: { o0: 0.6, o1: 0.4 } } } })
+  const out = run(ASK, { CLAUDE_PLUGIN_OPTION_PICK_THRESHOLD: '0.2' })
+  assert.equal(out.updatedInput.questions[0].options[0].description, '[jev pick 0.60] embedded')
 })
 
 test('SessionStart adds the question format to the context', () => {

@@ -81,6 +81,34 @@ Recommendation: B。アプリはもう Google Workspace を使っているので
 
 質問は前後の文章より少し遅れて表示される。プラグインが `Recommendation:` の行を待ってから Jev に聞くため。
 
+## 設定
+
+`/config`、または `~/.claude/settings.json` の `pluginConfigs` で変える。
+
+| 設定 | 既定値 | 内容 |
+| --- | --- | --- |
+| `auto_select` | `false` | AskUserQuestion の全質問に Jev の pick が付いたとき、ダイアログを出さずに pick で答える。pick の無い質問や複数選択の質問が 1 つでもあれば、いつもどおりダイアログが出る。Claude には Jev が選んだ回答だと伝える。本文の質問には自動で答えない。 |
+| `pick_threshold` | `0.6` | pick とみなす Jev の確信度の下限（0〜1）。`jev pick` の表示と `auto_select` の両方に効く。 |
+
+過去の回答 221 件では、試したどのしきい値でも Jev の pick とユーザーの選択の一致率は 70% 前後だった。しきい値を上げても、pick が付く回数が減るだけだった。
+
+| `pick_threshold` | pick が付いた質問 | pick とユーザーの選択の一致率 |
+| --- | --- | --- |
+| 0.5 | 47% | 72% |
+| 0.6 | 35% | 71% |
+| 0.7 | 27% | 67% |
+| 0.8 | 16% | 64% |
+
+`auto_select` を有効にすると、しきい値に関係なく、自動で選ばれた回答の 3〜4 つに 1 つは、自分なら選ばなかったものになる。
+
+```json
+"pluginConfigs": {
+  "jev-advise@jev-advise": {
+    "options": { "auto_select": true, "pick_threshold": 0.8 }
+  }
+}
+```
+
 ## TypeSafe に送るもの
 
 質問 1 つにつき、`api.typesafe.ai` へリクエストを 1 回送る。中身は質問と選択肢、上で書いた範囲の会話テキスト。system reminder とツールの入出力は送らない。

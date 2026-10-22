@@ -1,10 +1,26 @@
 {
   "name": "jev-advise",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Shows Jev's probabilities next to the choices Claude offers, without letting Claude or Jev see each other's recommendation",
   "license": "MIT",
   "author": {
     "name": "PeesukaGu"
   },
-  "repository": "https://github.com/PeesukaGu/jev-advise"
+  "repository": "https://github.com/PeesukaGu/jev-advise",
+  "userConfig": {
+    "auto_select": {
+      "type": "boolean",
+      "title": "Auto-select Jev's pick",
+      "description": "Answer AskUserQuestion with Jev's pick when Jev picks every question in it. Plain-text questions are never answered for you.",
+      "default": false
+    },
+    "pick_threshold": {
+      "type": "number",
+      "title": "Pick threshold",
+      "description": "Lowest Jev confidence (0 to 1) that counts as a pick, both for the jev pick tag and for auto-select.",
+      "default": 0.6,
+      "min": 0,
+      "max": 1
+    }
+  }
 }

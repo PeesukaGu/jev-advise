@@ -81,6 +81,34 @@ Recommendation: B, since the app already uses Google Workspace
 
 A question shows up a moment later than the text around it, because the plugin waits for the `Recommendation:` line before it asks Jev.
 
+## Settings
+
+Change these in `/config`, or under `pluginConfigs` in `~/.claude/settings.json`:
+
+| Setting | Default | What it does |
+| --- | --- | --- |
+| `auto_select` | `false` | Answers AskUserQuestion with Jev's pick, without showing you the dialog, when Jev picks every question in it. If any question has no pick, or allows several answers, the dialog appears as usual. Claude is told that Jev chose the answers. Plain-text questions are never answered for you. |
+| `pick_threshold` | `0.6` | The lowest Jev confidence, from 0 to 1, that counts as a pick. It sets both where `jev pick` appears and what `auto_select` answers. |
+
+On 221 past answers, Jev's pick matched the user's own choice about 70% of the time at every threshold we tried. A higher threshold only makes picks rarer:
+
+| `pick_threshold` | Questions with a pick | Pick matched the user |
+| --- | --- | --- |
+| 0.5 | 47% | 72% |
+| 0.6 | 35% | 71% |
+| 0.7 | 27% | 67% |
+| 0.8 | 16% | 64% |
+
+With `auto_select` on, expect about one auto-selected answer in three or four to differ from what you would have chosen, whatever the threshold.
+
+```json
+"pluginConfigs": {
+  "jev-advise@jev-advise": {
+    "options": { "auto_select": true, "pick_threshold": 0.8 }
+  }
+}
+```
+
 ## What is sent to TypeSafe
 
 Each question sends one request to `api.typesafe.ai`. The request holds the question, its options, and the conversation text described above. System reminders and tool inputs or outputs are not sent.
