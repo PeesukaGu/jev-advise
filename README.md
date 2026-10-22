@@ -41,6 +41,45 @@ From a shell:
 claude plugin install jev-advise --marketplace PeesukaGu/jev-advise
 ```
 
+## Usage
+
+There is nothing to run. Once the plugin is installed, the tags appear whenever Claude asks you to choose.
+
+### AskUserQuestion
+
+When Claude asks you something like "Which database should we use?", the dialog shows Jev's probability at the start of each description. Claude's own `(Recommended)` mark stays on the label, so you can compare the two:
+
+```
+Which database should we use?
+
+❯ 1. SQLite (Recommended)
+     [jev pick 0.82] Embedded, no server to run
+  2. PostgreSQL
+     [jev 0.18] Server-based, built for production
+```
+
+When Jev's confidence is below 0.6, no option is marked `jev pick`, and you see the probabilities only:
+
+```
+  1. Ship this week
+     [jev 0.55] Fix the remaining bugs after release
+  2. Wait a week
+     [jev 0.45] Release once every known bug is fixed
+```
+
+### Plain-text questions
+
+Ask Claude to question you in its reply, for example "Grill me on this plan before we start" or "Ask me what you need to decide the schema". Claude writes each question in the plugin's format, and the tags appear at the end of each option line:
+
+```
+**Q1** - **Auth**: How should users sign in?
+- A. Email and password: simplest to build `[jev 0.31]`
+- B. Google sign-in: no passwords to store `[jev pick 0.69]`
+
+Recommendation: B, since the app already uses Google Workspace
+```
+
+A question shows up a moment later than the text around it, because the plugin waits for the `Recommendation:` line before it asks Jev.
 
 ## What is sent to TypeSafe
 
