@@ -103,6 +103,8 @@ On 221 past answers, Jev's pick matched the user's own choice about 70% of the t
 
 With `auto_select` on, expect about one auto-selected answer in three or four to differ from what you would have chosen, whatever the threshold.
 
+Jev guesses your choice less often than Claude's own recommendation does. In a sample of 40 past answers, 30 questions had a `(Recommended)` option, and the user chose it 27 times. Jev's top option matched the user 16 times. On the 13 questions where the two differed, the user chose Claude's recommendation 12 times and Jev's option once.
+
 ```json
 "pluginConfigs": {
   "jev-advise@jev-advise": {

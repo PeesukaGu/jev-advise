@@ -103,6 +103,8 @@ Recommendation: B。アプリはもう Google Workspace を使っているので
 
 `auto_select` を有効にすると、しきい値に関係なく、自動で選ばれた回答の 3〜4 つに 1 つは、自分なら選ばなかったものになる。
 
+ユーザーの選択を当てる率は、Jev より Claude 自身の推奨のほうが高い。過去の回答 40 件のうち `(Recommended)` 付きの選択肢がある質問は 30 件で、ユーザーはそのうち 27 件で推奨を選んだ。Jev の最上位の選択肢が一致したのは 16 件だった。両者が割れた 13 件では、ユーザーが選んだのは Claude の推奨が 12 件、Jev の選択肢が 1 件だった。
+
 ```json
 "pluginConfigs": {
   "jev-advise@jev-advise": {
