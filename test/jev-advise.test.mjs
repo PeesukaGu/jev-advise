@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { spawnSync } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
 import { chmodSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -8,11 +8,11 @@ import { test } from 'node:test'
 const SCRIPT = new URL('../scripts/jev-advise.mjs', import.meta.url).pathname
 const ANSWER = { answers: { q: { choice: 'o0', confidence: 0.9, probabilities: { o0: 0.8, o1: 0.2 } } } }
 
-function setup(answer = ANSWER, entries = null) {
+function setup(answer = ANSWER, entries = null, { jevSeconds = 0 } = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'jev-advise-test-'))
   const sent = join(dir, 'sent.log')
   // A stand-in jev that records its arguments and stdin, then answers.
-  writeFileSync(join(dir, 'jev'), `#!/bin/sh\nfor a in "$@"; do case "$a" in @*) cat "\${a#@}" >> '${sent}' ;; *) printf '%s\\n' "$a" >> '${sent}' ;; esac; done\ncat >> '${sent}'\nprintf '%s' '${JSON.stringify(answer)}'\n`)
+  writeFileSync(join(dir, 'jev'), `#!/bin/sh\nfor a in "$@"; do case "$a" in @*) cat "\${a#@}" >> '${sent}' ;; *) printf '%s\\n' "$a" >> '${sent}' ;; esac; done\ncat >> '${sent}'\nsleep ${jevSeconds}\nprintf '%s' '${JSON.stringify(answer)}'\n`)
   chmodSync(join(dir, 'jev'), 0o755)
   const transcript = join(dir, 'transcript.jsonl')
   writeFileSync(transcript, (entries ?? [
@@ -28,7 +28,21 @@ function setup(answer = ANSWER, entries = null) {
     assert.equal(r.status, 0, r.stderr)
     return r.stdout ? JSON.parse(r.stdout).hookSpecificOutput : null
   }
-  return { run, sent: () => { try { return readFileSync(sent, 'utf8') } catch { return '' } } }
+  // Claude Code runs up to 3 MessageDisplay flushes of one message at once, and
+  // shows what each returns in index order, the original delta when it returns nothing.
+  const start = input => new Promise((resolve, reject) => {
+    const p = spawn('node', [SCRIPT], { env: { ...process.env, PATH: `${dir}:${process.env.PATH}`, CLAUDE_PLUGIN_DATA: dir } })
+    let out = ''
+    let err = ''
+    p.stdout.on('data', d => { out += d })
+    p.stderr.on('data', d => { err += d })
+    p.on('error', reject)
+    p.on('close', code => code === 0
+      ? resolve(out ? JSON.parse(out).hookSpecificOutput.displayContent : input.delta)
+      : reject(new Error(err)))
+    p.stdin.end(JSON.stringify({ transcript_path: transcript, ...input }))
+  })
+  return { run, start, sent: () => { try { return readFileSync(sent, 'utf8') } catch { return '' } } }
 }
 
 test('a plain-text question split across batches is shown with jev tags', () => {
@@ -45,6 +59,29 @@ test('a plain-text question split across batches is shown with jev tags', () => 
   assert.doesNotMatch(sent(), /I recommend SQLite/)
   assert.doesNotMatch(sent(), /secret/)
   assert.match(sent(), /which db\?/)
+})
+
+const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
+const Q1_TAGGED = '**Q1** - **DB**: which?\n- A. SQLite: embedded `[jev pick 0.80]`\n- B. PostgreSQL: server `[jev 0.20]`\n\nRecommendation: A\n'
+
+test('a flush that starts while an earlier one waits for jev does not show the question again', async () => {
+  const { run, start } = setup(ANSWER, null, { jevSeconds: 1 })
+  const base = { hook_event_name: 'MessageDisplay', turn_id: 't', message_id: 'c' }
+  const first = run({ ...base, index: 0, final: false, delta: '**Q1** - **DB**: which?\n- A. SQLite: embedded\n' }).displayContent
+  const second = start({ ...base, index: 1, final: false, delta: '- B. PostgreSQL: server\n\nRecommendation: A\n' })
+  await sleep(300)
+  const third = start({ ...base, index: 2, final: true, delta: '\nthanks\n' })
+  assert.equal([first, await second, await third].join(''), `${Q1_TAGGED}\nthanks\n`)
+})
+
+test('a flush that starts before the one ahead of it keeps every line in order', async () => {
+  const { run, start } = setup(ANSWER, null, { jevSeconds: 1 })
+  const base = { hook_event_name: 'MessageDisplay', turn_id: 't', message_id: 'o' }
+  const first = run({ ...base, index: 0, final: false, delta: '**Q1** - **DB**: which?\n' }).displayContent
+  const third = start({ ...base, index: 2, final: true, delta: '- B. PostgreSQL: server\n\nRecommendation: A\n' })
+  await sleep(300)
+  const second = start({ ...base, index: 1, final: false, delta: '- A. SQLite: embedded\n' })
+  assert.equal([first, await second, await third].join(''), Q1_TAGGED)
 })
 
 test('text without the question format is left alone', () => {

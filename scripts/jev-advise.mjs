@@ -5,7 +5,7 @@
 // - PreToolUse(AskUserQuestion): prefixes each option's description
 // - MessageDisplay: tags plain-text options on screen only, so Claude never reads them
 import { spawnSync } from 'node:child_process'
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -149,48 +149,69 @@ function annotateBlock(lines, context) {
   return out
 }
 
+// Claude Code runs up to 3 flushes of one message at once, so each flush waits
+// until the flush before it has saved what it holds back.
+const FLUSH_WAIT_MS = 5000
+
+function readHeldAfterPrevious(heldPath, index) {
+  if (index === 0) return null
+  const sleeper = new Int32Array(new SharedArrayBuffer(4))
+  const deadline = Date.now() + FLUSH_WAIT_MS
+  let state = null
+  while (true) {
+    try {
+      state = JSON.parse(readFileSync(heldPath, 'utf8'))
+    } catch {}
+    if (state?.index === index - 1 || Date.now() >= deadline) return state?.held ?? null
+    Atomics.wait(sleeper, 0, 0, 10)
+  }
+}
+
 function displayMessage(data) {
   // One question can span several display batches, so lines from its first
   // line to its recommendation line are held back and shown together.
   const dir = join(process.env.CLAUDE_PLUGIN_DATA || tmpdir(), 'jev-advise-held')
   const heldPath = join(dir, `${String(data.message_id).replace(/[^\w-]/g, '_')}.json`)
-  let held = null
-  try {
-    held = JSON.parse(readFileSync(heldPath, 'utf8'))
-  } catch {}
+  const index = Number(data.index) || 0
+  let held = readHeldAfterPrevious(heldPath, index)
   let changed = held !== null
-  let context = null
-  const out = []
-  const flush = lines => {
-    context ??= recentContext(data.transcript_path)
-    out.push(...annotateBlock(lines, context))
-  }
+  // Strings are shown as they are; arrays are question blocks to tag.
+  const parts = []
   for (const line of data.delta.match(/[^\n]*\n|[^\n]+$/g) ?? []) {
     if (Q_START.test(line)) {
-      if (held) flush(held)
+      if (held) parts.push(held)
       held = [line]
       changed = true
     } else if (held) {
       held.push(line)
       if (Q_END.test(line)) {
-        flush(held)
+        parts.push(held)
         held = null
       }
     } else {
-      out.push(line)
+      parts.push(line)
     }
   }
   if (data.final && held) {
-    flush(held)
+    parts.push(held)
     held = null
   }
-  if (held) {
-    mkdirSync(dir, { recursive: true })
-    writeFileSync(heldPath, JSON.stringify(held))
-  } else {
+  // Saved before jev runs, so the next flush neither waits for jev nor sees blocks this one shows.
+  if (data.final) {
     rmSync(heldPath, { force: true })
+  } else {
+    mkdirSync(dir, { recursive: true })
+    const tmp = `${heldPath}.${process.pid}.tmp`
+    writeFileSync(tmp, JSON.stringify({ index, held }))
+    renameSync(tmp, heldPath)
   }
-  return changed ? out.join('') : null
+  if (!changed) return null
+  let context = null
+  return parts.flatMap(p => {
+    if (typeof p === 'string') return [p]
+    context ??= recentContext(data.transcript_path)
+    return annotateBlock(p, context)
+  }).join('')
 }
 
 function main() {
